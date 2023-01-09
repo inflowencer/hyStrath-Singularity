@@ -1,0 +1,45 @@
+Bootstrap: library
+From: benkenney/openfoam/openfoam2206_jammy:latest
+
+%environment
+    # export OMPI_DIR=/opt/ompi
+    # export SINGULARITY_OMPI_DIR=$OMPI_DIR
+    # export SINGULARITYENV_APPEND_PATH=$OMPI_DIR/bin
+    # export SINGULAIRTYENV_APPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+    # Source the OpenFOAM environment and run-functions
+    # . /usr/lib/openfoam/openfoam2206/etc/bashrc
+    # . $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+%post -c /bin/bash
+
+
+    echo "Installing required packages..."
+    apt-get -y update
+    apt-get install -y wget git bash gcc gfortran g++ make file bc automake bzip2
+
+    # echo "Installing Open MPI"
+    # export OMPI_DIR=/opt/ompi
+    # export OMPI_VERSION=4.1.4
+    # export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.4.tar.bz2"
+    # mkdir -p /tmp/ompi
+    # mkdir -p /opt
+    # # Download
+    # cd /tmp/ompi && wget -O openmpi-$OMPI_VERSION.tar.bz2 $OMPI_URL && tar -xjf openmpi-$OMPI_VERSION.tar.bz2
+    # # Compile and install
+    # cd /tmp/ompi/openmpi-$OMPI_VERSION && ./configure --prefix=$OMPI_DIR && make -j install
+    # # Set env variables so we can compile our application
+    # export PATH=$OMPI_DIR/bin:$PATH
+    # export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+    # Activate OpenFOAM environment
+    mkdir -p /usr/lib/openfoam/user-v2206 && cd /usr/lib/openfoam/user-v2206
+    sed -i 's/WM_PROJECT_USER_DIR=.*/WM_PROJECT_USER_DIR=\/usr\/lib\/openfoam\/user-v2206/' /usr/lib/openfoam/openfoam2206/etc/bashrc
+    source /usr/lib/openfoam/openfoam2206/etc/bashrc
+    # sed -i 's/.*WM_PROJECT_USER_DIR.*/export WM_PROJECT_USER_DIR="/usr/lib/openfoam/user-v2206"/' /usr/lib/openfoam/openfoam2206/etc/bashrc
+
+    # hyStrath Installation
+
+    # Clone files and install
+    git clone -b docker-2206 --single-branch https://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@github.com/vincentcasseau/hyStrath-UniBw.git
+    cd hyStrath-UniBw 
+    chmod +x install.sh convert_v2206.sh
+    ./install.sh && ./convert_v2206.sh
