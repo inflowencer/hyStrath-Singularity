@@ -8,7 +8,7 @@ and particle-based DSMC solvers for space related and atmospheric reentry modell
 You need to have Singularity installed. Follow [this guide](install_Singularity.md) for instructions on how to install
 Singularity on Ubuntu.
 
-### Official Singularity Image (recommended)
+### Singularity Image (recommended)
 
 You can directly pull it from the official [Singularity library](https://cloud.sylabs.io/library/inflowencer/openfoam/hystrath):
 
