@@ -1,49 +1,109 @@
 # hyStrath-Singularity - Rarefied Gas Dynamics Code Based on [OpenFOAM](openfoam.com)
 
-Singularity (Apptainer) of hyStrath, developed by [Dr. Vincent Casseau](https://hystrath.github.io/). Includes compressible CFD
-and particle-based DSMC solvers for space related and atmospheric reentry modelling.
+Singularity (Apptainer) of hyStrath, mainly developed by [Dr. Vincent Casseau](https://hystrath.github.io/). Includes
+compressible CFD and particle-based DSMC solvers for space related and atmospheric reentry modelling.
+
+Current stable release: **hystrath-1706**
 
 ## 1. Installation
 
+#### Build Singularity
+
 You need to have Singularity installed. Follow [this guide](install_Singularity.md) for instructions on how to install
-Singularity on Ubuntu.
+Singularity on Linux/Ubuntu.
 
-### Singularity Image (recommended)
+#### Pull Singularity Image
 
-You can directly pull it from the official [Singularity library](https://cloud.sylabs.io/library/inflowencer/openfoam/hystrath):
+Directly pull it from the official [Singularity library](https://cloud.sylabs.io/library/inflowencer/openfoam/hystrath):
 
 ```sh
 mkdir -p ~/images/singularity && cd ~/images/singularity
-singularity pull library://inflowencer/openfoam/hystrath
+singularity pull library://inflowencer/openfoam/hystrath:1706
 ```
 
-### From GitHub Repo
+#### Setup OpenMPI
 
-Alternatively, you can build it yourself from this GitHub repo. Clone the repo and build using:
+For optimal performance and compatibility, the host MPI and image MPI should be the same. hystrath-1706 uses 
+**openmpi-2.1.1**.
 
 ```sh
-cd ~/ && git clone https://github.com/inflowencer/hyStrath-Docker.git && cd hyStrath-Docker
-docker build -t hystrath .
+mkdir -p ~/openmpi && cd ~/openmpi
+wget https://download.open-mpi.org/release/open-mpi/v2.1/openmpi-2.1.1.tar.gz
+tar xzf openmpi-2.1.1.tar.gz && mv openmpi-2.1.1 openmpi/2.1.1
+cd 2.1.1 && mkdir -p build && cd build
+sudo ../configure --prefix=$(pwd)
 ```
 
 ## 2. Workflow
 
-1. Setup your case inside a folder where you want to run it
+#### Setup your case inside a folder
 
-   ```sh
-   mkdir -p ~/hystrath-runs/viking-reentry && cd ~/hystrath-runs/viking-reentry
-   ```
+```sh
+mkdir -p ~/hystrath-runs/Mach_20_cylinder
+cd ~/hystrath-runs/Mach_20_cylinder
 
-2. Run the docker container and mount the **current host directory** to the container directory `/run`
+# Case structure should look like this
+Mach_20_cylinder/
+├── 0
+├── Allpre
+├── Allrun
+├── constant
+└── system
+```
 
-   ```sh
-   docker run -it --mount src="$(pwd)",target=/run,type=bind hystrath:latest
-   ```
+#### Run the preprocessing tasks
 
-   Any changes or files written to the container `/run` folder are going to be written to the host
-   `~/hystrath-runs/viking-reentry` folder.
+Usually this includes the **creation or conversion of a mesh** and the **domain decomposition**.
+Create an `Allpre` file inside your working directory
 
-## 3. Run an Example
+```sh
+#!/bin/bash
+source /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc  # Activate OpenFOAM
+
+# Remove old preprocessing log files
+rm -f log.blockMesh
+rm -f log.snappyHexMesh
+rm -f log.checkMesh
+rm -f log.decomposePar
+
+runApplication blockMesh
+runApplication snappyHexMesh
+runApplication checkMesh
+runApplication decomposePar -cellDist -force -latestTime
+```
+
+Don't forget to make it executable `chmod +x Allpre`. Now we can execute the image to run our `Allpre` script.
+
+```sh
+$ singularity exec ~/images/singularity/hystrath_1706.sif ./Allpre
+```
+
+Any changes or files written during image run-time will be written to the host.
+
+#### Run the solver
+
+For this, we need an `Allrun` file.
+
+```sh
+#!/bin/bash
+source /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc  # Activate OpenFOAM
+
+# Remove old solver log files
+rm -f log.hy2Foam
+
+# Notice that we do not specify mpirun here
+hy2Foam -parallel
+```
+
+To run the solver in parallel, we call the image with `mpirun` and specify the Allrun script:
+
+```sh
+$ mpirun -np 8 singularity exec ~/images/singularity/hystrath_1706.sif ./Allrun > log.2>&1
+```
+
+
+
+<!-- ## 3. Run an Example
 
 ### Viking Mars Reentry
 
@@ -76,4 +136,4 @@ docker build -t hystrath .
     exit
     paraview &
     # Open the pv.foam file and use `decomposedCase` to postprocess
-    ```
+    ``` -->

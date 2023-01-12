@@ -1,0 +1,82 @@
+Bootstrap: library
+From: library/default/ubuntu:bionic
+
+%environment
+    export OMPI_DIR=/opt/ompi
+    export SINGULARITY_OMPI_DIR=$OMPI_DIR
+    export SINGULARITYENV_APPEND_PATH=$OMPI_DIR/bin
+    export SINGULAIRTYENV_APPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+    # For OpenFOAM
+    export PATH=$OMPI_DIR/bin:$PATH
+    export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+
+%files
+    src/OpenFOAM-v1706.tgz /usr/lib
+    src/ThirdParty-v1706.tgz /usr/lib
+
+%post -c /bin/bash
+
+    echo "Installing prerequisites..."
+    apt-get update
+    apt-get install -y build-essential flex bison cmake zlib1g-dev libboost-system-dev libboost-thread-dev gnuplot libreadline-dev libncurses-dev libxt-dev \
+    qt4-dev-tools libqt4-dev libqt4-opengl-dev freeglut3-dev libqtwebkit-dev \
+    libscotch-dev libcgal-dev bc bzip2 wget git
+    # libopenmpi-dev openmpi-bin
+
+    # OpenMPI 2.1.1
+    echo "Installing Open MPI"
+    export OMPI_DIR=/opt/ompi
+    export OMPI_VERSION=2.1.1
+    export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v2.1/openmpi-$OMPI_VERSION.tar.bz2"
+    mkdir -p /tmp/ompi
+    mkdir -p /opt
+    # Download
+    cd /tmp/ompi && wget -O openmpi-$OMPI_VERSION.tar.bz2 $OMPI_URL && tar -xjf openmpi-$OMPI_VERSION.tar.bz2
+    # Compile and install
+    cd /tmp/ompi/openmpi-$OMPI_VERSION && ./configure --prefix=$OMPI_DIR && make install
+    # Set env variables so we can compile our application
+    export PATH=$OMPI_DIR/bin:$PATH
+    export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+    export MANPATH=$OMPI_DIR/share/man:$MANPATH
+
+    # OpenFOAM
+    cd /usr/lib
+    tar -xzf OpenFOAM-v1706.tgz
+    tar -xzf ThirdParty-v1706.tgz
+    rm *.tgz
+    mkdir -p openfoam
+    mv OpenFOAM-v1706/ ThirdParty-v1706/ openfoam/.
+    cd openfoam
+    mkdir -p user-v1706
+
+    sed -i 's/WM_PROJECT_USER_DIR=.*/WM_PROJECT_USER_DIR=\/usr\/lib\/openfoam\/user-v1706/' /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc
+    source /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc
+
+    # ThirdParty build
+    cd ThirdParty-v1706
+    ./Allwmake -j
+
+    # OpenFOAM build
+    cd ../OpenFOAM-v1706
+    ./Allwmake -j
+
+    # hyStrath-1706 clone and install
+    cd /usr/lib/openfoam/user-v1706
+    git clone -b docker-1706 --single-branch https://github.com/vincentcasseau/hyStrath-UniBw.git
+    cd hyStrath-UniBw 
+    chmod +x install.sh 
+    ./install.sh
+
+
+# Scratch
+    # gcc-7
+    # yum install -y centos-release-scl
+    # yum install -y devtoolset-7-gcc-*
+    # source scl_source enable devtoolset-7
+    # Source the OpenFOAM environment and run-functions
+    # . /usr/lib/openfoam/openfoam2206/etc/bashrc
+    # . $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+# %files
+#     src/OpenFOAM-v1706.tgz /usr/lib/
+#     src/ThirdParty-v1706.tgz /usr/lib/

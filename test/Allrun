@@ -1,0 +1,3 @@
+#!/bin/bash
+
+source /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc
