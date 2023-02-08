@@ -7,12 +7,12 @@ Current stable release: **hystrath-1706**
 
 ## 1. Installation
 
-#### Build Singularity
+### Build Singularity
 
 You need to have Singularity installed. Follow [this guide](install_Singularity.md) for instructions on how to install
 Singularity on Linux/Ubuntu.
 
-#### Pull Singularity Image
+### Pull Singularity Image
 
 Directly pull it from the official [Singularity library](https://cloud.sylabs.io/library/inflowencer/openfoam/hystrath):
 
@@ -21,22 +21,20 @@ mkdir -p ~/images/singularity && cd ~/images/singularity
 singularity pull library://inflowencer/openfoam/hystrath:1706
 ```
 
-#### Setup OpenMPI
+### Setup OpenMPI
 
 For optimal performance and compatibility, the host MPI and image MPI should be the same. hystrath-1706 uses 
-**openmpi-2.1.1**.
+**openmpi-4.1.4**.
 
 ```sh
 mkdir -p ~/openmpi && cd ~/openmpi
-wget https://download.open-mpi.org/release/open-mpi/v2.1/openmpi-2.1.1.tar.gz
-tar xzf openmpi-2.1.1.tar.gz && mv openmpi-2.1.1 openmpi/2.1.1
-cd 2.1.1 && mkdir -p build && cd build
-sudo ../configure --prefix=$(pwd)
+wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.4.tar.gz && tar -xzf openmpi-4.1.4.tar.gz
+cd openmpi-4.1.4 && ./configure --prefix=$(pwd)
 ```
 
 ## 2. Workflow
 
-#### Setup your case inside a folder
+### Setup your case inside a folder
 
 ```sh
 mkdir -p ~/hystrath-runs/Mach_20_cylinder
@@ -51,7 +49,7 @@ Mach_20_cylinder/
 └── system
 ```
 
-#### Run the preprocessing tasks
+### Run the preprocessing tasks
 
 Usually this includes the **creation or conversion of a mesh** and the **domain decomposition**.
 Create an `Allpre` file inside your working directory
@@ -80,7 +78,7 @@ $ singularity exec ~/images/singularity/hystrath_1706.sif ./Allpre
 
 Any changes or files written during image run-time will be written to the host.
 
-#### Run the solver
+### Run the solver
 
 For this, we need an `Allrun` file.
 

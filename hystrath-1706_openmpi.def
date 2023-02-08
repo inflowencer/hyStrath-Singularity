@@ -2,7 +2,8 @@ Bootstrap: library
 From: library/default/ubuntu:bionic
 
 %environment
-    export OMPI_DIR=/opt/ompi
+    # export OMPI_DIR=/usr/lib/openfoam/ThirdParty-v1706/openmpi-4.1.4
+    export OMPI_DIR=/usr/lib/openmpi-4.1.4
     export SINGULARITY_OMPI_DIR=$OMPI_DIR
     export SINGULARITYENV_APPEND_PATH=$OMPI_DIR/bin
     export SINGULAIRTYENV_APPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
@@ -19,46 +20,77 @@ From: library/default/ubuntu:bionic
     echo "Installing prerequisites..."
     apt-get update
     apt-get install -y build-essential flex bison cmake zlib1g-dev libboost-system-dev libboost-thread-dev gnuplot libreadline-dev libncurses-dev libxt-dev \
-    qt4-dev-tools libqt4-dev libqt4-opengl-dev freeglut3-dev libqtwebkit-dev \
-    libscotch-dev libcgal-dev bc bzip2 wget git
-    # libopenmpi-dev openmpi-bin
+      libcgal-dev bc bzip2 wget git 
 
-    # OpenMPI 2.1.1
-    echo "Installing Open MPI"
-    export OMPI_DIR=/opt/ompi
-    export OMPI_VERSION=2.1.1
-    export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v2.1/openmpi-$OMPI_VERSION.tar.bz2"
-    mkdir -p /tmp/ompi
-    mkdir -p /opt
-    # Download
-    cd /tmp/ompi && wget -O openmpi-$OMPI_VERSION.tar.bz2 $OMPI_URL && tar -xjf openmpi-$OMPI_VERSION.tar.bz2
-    # Compile and install
-    cd /tmp/ompi/openmpi-$OMPI_VERSION && ./configure --prefix=$OMPI_DIR && make install
-    # Set env variables so we can compile our application
-    export PATH=$OMPI_DIR/bin:$PATH
-    export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
-    export MANPATH=$OMPI_DIR/share/man:$MANPATH
+    # libscotch-dev libscotchmetis-dev llibscotchparmetis-dev libscotch-6.0
+    # libopenmpi-dev openmpi-bin
+    # qt4-dev-tools libqt4-dev libqt4-opengl-dev freeglut3-dev libqtwebkit-dev \
+
+    # OpenMPI 4.1.4
+    # echo "Installing Open MPI"
+    # export OMPI_DIR=/opt/ompi
+    # export OMPI_VERSION=4.1.4
+    # export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-$OMPI_VERSION.tar.bz2"
+    # mkdir -p /tmp/ompi
+    # mkdir -p /opt
+    # # Download
+    # cd /tmp/ompi && wget -O openmpi-$OMPI_VERSION.tar.bz2 $OMPI_URL && tar -xjf openmpi-$OMPI_VERSION.tar.bz2
+    # # Compile and install
+    # cd /tmp/ompi/openmpi-$OMPI_VERSION && ./configure --prefix=$OMPI_DIR && make install
+    # # Set env variables so we can compile our application
+    # export PATH=$OMPI_DIR/bin:$PATH
+    # export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+    # export MANPATH=$OMPI_DIR/share/man:$MANPATH
+
 
     # OpenFOAM
     cd /usr/lib
     tar -xzf OpenFOAM-v1706.tgz
     tar -xzf ThirdParty-v1706.tgz
-    rm *.tgz
+    wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.4.tar.gz && tar -xzf openmpi-4.1.4.tar.gz
+    # Clean extracted archives
+    rm *.tgz *.gz
+
+    # Install OpenMPI 4.1.4
+    cd openmpi-4.1.4 && ./configure --prefix="$(pwd)" && make -j && make install
+    export OMPI_DIR=/usr/lib/openmpi-4.1.4
+    export MPI_ROOT=$OMPI_DIR
+    export PATH=$OMPI_DIR/bin:$PATH
+    export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+    export MANPATH=$OMPI_DIR/share/man:$MANPATH
+    cd ..
+
+    # Create OpenFOAM directories
     mkdir -p openfoam
     mv OpenFOAM-v1706/ ThirdParty-v1706/ openfoam/.
     cd openfoam
     mkdir -p user-v1706
 
+    # Set correct env variables and OpenMPI
     sed -i 's/WM_PROJECT_USER_DIR=.*/WM_PROJECT_USER_DIR=\/usr\/lib\/openfoam\/user-v1706/' /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc
+    sed -i 's/WM_MPLIB=.*/WM_MPLIB=SYSTEMOPENMPI/' /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc
+    # sed -i 's/FOAM_MPI=.*/FOAM_MPI=openmpi-4.1.4/' /usr/lib/openfoam/OpenFOAM-v1706/etc/config.sh/mpi
+    # Scotch
+    sed -i 's/SCOTCH_VERSION=.*/SCOTCH_VERSION=scotch-v7.0.3/' /usr/lib/openfoam/OpenFOAM-v1706/etc/config.sh/scotch
+
+    # Activate OpenFOAM environment
     source /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc
 
     # ThirdParty build
     cd ThirdParty-v1706
-    ./Allwmake -j
+    # Additional libraries
+    wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz && tar -xzf metis-5.1.0.tar.gz
+    # wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.4.tar.gz && tar -xzf openmpi-4.1.4.tar.gz
+    wget https://gitlab.inria.fr/scotch/scotch/-/archive/v7.0.3/scotch-v7.0.3.tar.gz && tar -xzf scotch-v7.0.3.tar.gz
+
+    ./Allwmake -j | tee thirdparty_build.log
+
+    # Set env variables
+    # export OMPI_DIR=/usr/lib/openfoam/ThirdParty-v1706/platforms/linux64Gcc/openmpi-4.1.4
 
     # OpenFOAM build
     cd ../OpenFOAM-v1706
-    ./Allwmake -j
+    ./Allwmake -j | tee openfoam_build.log
 
     # hyStrath-1706 clone and install
     cd /usr/lib/openfoam/user-v1706
