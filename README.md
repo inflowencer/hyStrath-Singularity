@@ -17,7 +17,7 @@ Singularity on Linux/Ubuntu.
 Directly pull it from the official [Singularity library](https://cloud.sylabs.io/library/inflowencer/openfoam/hystrath):
 
 ```sh
-mkdir -p ~/images/singularity && cd ~/images/singularity
+mkdir -p ~/containers/singularity && cd ~/containers/singularity
 singularity pull library://inflowencer/openfoam/hystrath:1706
 ```
 
@@ -49,89 +49,97 @@ Mach_20_cylinder/
 └── system
 ```
 
-### Run the preprocessing tasks
+### Preprocessing
 
 Usually this includes the **creation or conversion of a mesh** and the **domain decomposition**.
-Create an `Allpre` file inside your working directory
+Create an `Allpre` file inside your working directory:
 
 ```sh
 #!/bin/bash
 source /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc  # Activate OpenFOAM
 
 # Remove old preprocessing log files
-rm -f log.blockMesh
-rm -f log.snappyHexMesh
-rm -f log.checkMesh
-rm -f log.decomposePar
+rm -f log.*
 
-runApplication blockMesh
-runApplication snappyHexMesh
-runApplication checkMesh
-runApplication decomposePar -cellDist -force -latestTime
+blockMesh
+snappyHexMesh
+checkMesh
+decomposePar -cellDist -force -latestTime
 ```
 
 Don't forget to make it executable `chmod +x Allpre`. Now we can execute the image to run our `Allpre` script.
 
 ```sh
-$ singularity exec ~/images/singularity/hystrath_1706.sif ./Allpre
+singularity exec ~/containers/singularity/hystrath_1706.sif ./Allpre
 ```
 
 Any changes or files written during image run-time will be written to the host.
 
-### Run the solver
+### Solving
 
-For this, we need an `Allrun` file.
+For this, we need an `Allrun` file containing:
 
 ```sh
 #!/bin/bash
 source /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc  # Activate OpenFOAM
+rm -f log.hy2Foam  # Remove old solver log files
 
-# Remove old solver log files
-rm -f log.hy2Foam
-
-# Notice that we do not specify mpirun here
-hy2Foam -parallel
+hy2Foam -parallel  # Notice that we do not specify mpirun here
 ```
 
 To run the solver in parallel, we call the image with `mpirun` and specify the Allrun script:
 
 ```sh
-$ mpirun -np 8 singularity exec ~/images/singularity/hystrath_1706.sif ./Allrun > log.2>&1
+mpirun -np 8 singularity exec ~/containers/singularity/hystrath_1706.sif ./Allrun
 ```
 
+If you have different MPI versions on your pc, you can directly call the `openmpi-4.1.4` executable:
 
+```sh
+/home/user/openmpi/openmpi-4.1.4/bin/mpirun -np 8 singularity exec ~/containers/singularity/hystrath_1706.sif ./Allrun
+```
 
-<!-- ## 3. Run an Example
+where `user` must be replaced with your username.
 
-### Viking Mars Reentry
+### Postprocessing
 
-1.  Clone the [hyStrath-Examples Collection](https://github.com/inflowencer/hyStrath-Examples) and copy the Viking Mars
-    Reentry case to your `hystrath-run` directory on the host
+In this stage you would postprocess your case and optionally reconstruct the decomposed `processor` directories.
+Create an `Allpost` script:
 
-    ```sh
-    git clone https://github.com/inflowencer/hyStrath-Examples.git ~/hyStrath-Examples
-    cp -r ~/hyStrath-Examples/examples/viking-mars-reentry ~/hystrath-runs/.
-    # Switch into the directory 
-    cd ~/hystrath-runs/viking-mars-reentry
-    ```
+```sh
+source /usr/lib/openfoam/OpenFOAM-v1706/etc/bashrc  # Activate OpenFOAM
 
-2.  Run the docker container and mount the working directory to the container `/run` directory
+hy2Foam -postProcess -dict 'system/surfaceCoefficients' -latestTime
+reconstructPar
+# Optionally, create VTK files of the case 
+foamToVTK
+```
 
-    ```sh
-    docker run -it --mount src="$(pwd)",target=/run,type=bind hystrath:latest
-    cd /run
-    ```
+To postprocess your case, you can then run:
 
-3.  Run the case
+```sh
+singularity exec ~/containers/singularity/hystrath_1706.sif ./Allpre
+```
 
-    ```sh
-    ./Allrun
-    ```
+## 3. Examples
 
-4.  After the case ran through, you can close the docker container and postprocess it
+Examples for this code can be found in the [hyStrath-Examples](https://github.com/inflowencer/hyStrath-Examples) repo.
 
-    ```sh
-    exit
-    paraview &
-    # Open the pv.foam file and use `decomposedCase` to postprocess
-    ``` -->
+## 4. Tips and Tricks
+
+It is convenient to specify aliases for certain Singularity commands. Add those lines to your `~/.bashrc` or `~/.zshrc`:
+
+```sh
+alias s="singularity"
+alias spre="singularity exec ~/containers/singularity/hystrath_1706.sif ./Allpre"
+alias spost="singularity exec ~/containers/singularity/hystrath_1706.sif ./Allpost"
+function sprun() { 
+    /home/user/openmpi/openmpi-4.1.4/bin/mpirun -np $1 singularity exec ~/containers/singularity/hystrath_1706.sif ./Allrun
+}
+```
+
+If you have your `Allpre` and `Allrun` scripts correctly setup, you can run the case much easier with these aliases.
+For instance, to run the [preprocessing tasks](#run-the-preprocessing-tasks), you can just enter `spre`.
+
+To run a case, you would execute `sprun 8` to run with 8 processors. And finally, for postprocessing you can execute
+`spost`.
