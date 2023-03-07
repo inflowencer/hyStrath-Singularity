@@ -1,0 +1,75 @@
+Bootstrap: docker
+From: opensuse/leap
+
+%environment
+    export OMPI_DIR=/usr/lib64/mpi/gcc/openmpi4
+    # export OMPI_DIR=/usr/lib/openmpi-4.1.4
+    export SINGULARITY_OMPI_DIR=$OMPI_DIR
+    export SINGULARITYENV_APPEND_PATH=$OMPI_DIR/bin
+    export SINGULAIRTYENV_APPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+    # For OpenFOAM
+    export PATH=$OMPI_DIR/bin:$PATH
+    export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+
+%files
+    src/OpenFOAM-v2212.tgz /usr/lib
+    src/ThirdParty-v2212.tgz /usr/lib
+
+%post -c /bin/bash
+
+    # Prerequisites
+    zypper install -y gcc12 gcc12-c++
+    zypper install -t pattern devel_C_C++
+    zypper install -y cmake gnuplot flex libfl-devel readline-devel zlib-devel openmpi4-devel
+    zypper install -y gmp-devel mpfr-devel mpc-devel
+    zypper install -y wget tar devtoolset-11
+
+    ln -s /usr/bin/gcc-12 /usr/bin/gcc
+    ln -s /usr/bin/g++-12 /usr/bin/g++
+
+    export CC=$(which gcc-12)
+    export CXX=$(which g++-12)
+
+    # Export MPI Variables
+    export OMPI_DIR=/usr/lib64/mpi/gcc/openmpi4
+    export MPI_ROOT=$OMPI_DIR
+    export PATH=$PATH:/usr/lib64/mpi/gcc/openmpi4/bin
+    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib64/mpi/gcc/openmpi/lib
+
+
+    # # OpenFOAM
+    cd /usr/lib
+    tar -xzf OpenFOAM-v2212.tgz
+    tar -xzf ThirdParty-v2212.tgz
+    # wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.4.tar.gz && tar -xzf openmpi-4.1.4.tar.gz
+    # Clean extracted archives
+    rm -f *.tgz *.gz
+
+    # Create OpenFOAM directories
+    mkdir -p openfoam
+    mv OpenFOAM-v2212/ ThirdParty-v2212/ openfoam/.
+    cd openfoam
+    mkdir -p user-v2212
+
+    # Set correct env variables and OpenMPI
+    sed -i 's/WM_PROJECT_USER_DIR=.*/WM_PROJECT_USER_DIR=\/usr\/lib\/openfoam\/user-v2212/' /usr/lib/openfoam/OpenFOAM-v2212/etc/bashrc
+    sed -i 's/WM_MPLIB=.*/WM_MPLIB=SYSTEMOPENMPI/' /usr/lib/openfoam/OpenFOAM-v2212/etc/bashrc
+    # sed -i 's/FOAM_MPI=.*/FOAM_MPI=openmpi-4.1.4/' /usr/lib/openfoam/OpenFOAM-v1706/etc/config.sh/mpi
+    # Scotch
+    # sed -i 's/SCOTCH_VERSION=.*/SCOTCH_VERSION=scotch-v7.0.3/' /usr/lib/openfoam/OpenFOAM-v1706/etc/config.sh/scotch
+
+    # Activate OpenFOAM environment
+    source /usr/lib/openfoam/OpenFOAM-v2212/etc/bashrc
+
+    # ThirdParty build
+    cd ThirdParty-v2212
+    # Additional libraries
+    wget https://src.fedoraproject.org/lookaside/pkgs/metis/metis-5.1.0.tar.gz/md5/5465e67079419a69e0116de24fce58fe/metis-5.1.0.tar.gz && tar -xzf metis-5.1.0.tar.gz
+    # wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/metis/metis-5.1.0.tar.gz && tar -xzf metis-5.1.0.tar.gz
+    # wget https://gitlab.inria.fr/scotch/scotch/-/archive/v7.0.3/scotch-v7.0.3.tar.gz && tar -xzf scotch-v7.0.3.tar.gz
+
+    ./Allwmake -j | tee thirdparty_build.log
+
+    # OpenFOAM build
+    cd ../OpenFOAM-v2212
+    ./Allwmake -j | tee openfoam_build.log
