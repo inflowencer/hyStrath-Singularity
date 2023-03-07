@@ -19,7 +19,7 @@ From: opensuse/leap
 
     # Prerequisites
     zypper install -y gcc12 gcc12-c++
-    zypper install -t pattern devel_C_C++
+    zypper install -y -t pattern devel_C_C++
     zypper install -y cmake gnuplot flex libfl-devel readline-devel zlib-devel openmpi4-devel
     zypper install -y gmp-devel mpfr-devel mpc-devel
     zypper install -y wget tar devtoolset-11
@@ -72,4 +72,4 @@ From: opensuse/leap
 
     # OpenFOAM build
     cd ../OpenFOAM-v2212
-    ./Allwmake -j | tee openfoam_build.log
+    ./Allwmake -j -k | tee openfoam_build.log
